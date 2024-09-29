@@ -1,4 +1,5 @@
 import { playlistCategories } from '@/utils/staticData';
+import shortcuts from '@/utils/shortcuts';
 
 console.debug('[debug][initLocalStorage.js]');
 const enabledPlaylistCategories = playlistCategories
@@ -9,27 +10,33 @@ let localStorage = {
   player: {},
   settings: {
     lang: null,
+    musicLanguage: 'all',
     appearance: 'auto',
     musicQuality: 320000,
     lyricFontSize: 28,
     outputDevice: 'default',
     showPlaylistsByAppleMusic: true,
     enableUnblockNeteaseMusic: true,
-    automaticallyCacheSongs: false,
-    cacheLimit: false,
+    automaticallyCacheSongs: true,
+    cacheLimit: 8192,
+    enableReversedMode: false,
     nyancatStyle: false,
     showLyricsTranslation: true,
-    lyricsBackground: false,
-    minimizeToTray: false,
+    lyricsBackground: true,
+    enableOsdlyricsSupport: false,
+    closeAppOption: 'ask',
     enableDiscordRichPresence: false,
     enableGlobalShortcut: true,
     showLibraryDefault: false,
+    subTitleDefault: false,
+    linuxEnableCustomTitlebar: false,
     enabledPlaylistCategories,
     proxyConfig: {
       protocol: 'noProxy',
       server: '',
       port: null,
     },
+    shortcuts: shortcuts,
   },
   data: {
     user: {},

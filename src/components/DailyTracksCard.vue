@@ -1,6 +1,6 @@
 <template>
   <div class="daily-recommend-card" @click="goToDailyTracks">
-    <img :src="coverUrl" />
+    <img :src="coverUrl" loading="lazy" />
     <div class="container">
       <div class="title-box">
         <div class="title">
@@ -18,6 +18,7 @@
 </template>
 
 <script>
+import locale from '@/locale';
 import { mapMutations, mapState, mapActions } from 'vuex';
 import { dailyRecommendTracks } from '@/api/playlist';
 import { isAccountLoggedIn } from '@/utils/auth';
@@ -61,7 +62,7 @@ export default {
     },
     playDailyTracks() {
       if (!isAccountLoggedIn()) {
-        this.showToast('此操作需要登录网易云账号');
+        this.showToast(locale.t('toast.needToLogin'));
         return;
       }
       let trackIDs = this.dailyTracks.map(t => t.id);
@@ -83,6 +84,7 @@ export default {
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  z-index: 1;
 }
 
 img {

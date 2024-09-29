@@ -9,6 +9,9 @@ export function isTrackPlayable(track) {
     playable: true,
     reason: '',
   };
+  if (track?.privilege?.pl > 0) {
+    return result;
+  }
   // cloud storage judgement logic
   if (isAccountLoggedIn() && track?.privilege?.cs) {
     return result;
@@ -37,6 +40,7 @@ export function isTrackPlayable(track) {
 }
 
 export function mapTrackPlayableStatus(tracks, privileges = []) {
+  if (tracks?.length === undefined) return tracks;
   return tracks.map(t => {
     const privilege = privileges.find(item => item.id === t.id) || {};
     if (t.privilege) {
@@ -217,7 +221,7 @@ export function bytesToSize(bytes) {
 
 export function formatTrackTime(value) {
   if (!value) return '';
-  let min = ~~((value / 60) % 60);
+  let min = ~~(value / 60);
   let sec = (~~(value % 60)).toString().padStart(2, '0');
   return `${min}:${sec}`;
 }

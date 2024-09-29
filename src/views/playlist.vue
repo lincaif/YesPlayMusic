@@ -1,5 +1,5 @@
 <template>
-  <div v-show="show">
+  <div v-show="show" class="playlist">
     <div
       v-if="specialPlaylistInfo === undefined && !isLikeSongsPage"
       class="playlist-info"
@@ -27,11 +27,7 @@
           <span
             v-if="
               [
-                5277771961,
-                5277965913,
-                5277969451,
-                5277778542,
-                5278068783,
+                5277771961, 5277965913, 5277969451, 5277778542, 5278068783,
               ].includes(playlist.id)
             "
             style="font-weight: 600"
@@ -143,9 +139,12 @@
 
     <div v-if="isLikeSongsPage" class="user-info">
       <h1>
-        <img class="avatar" :src="data.user.avatarUrl | resizeImage" />{{
-          data.user.nickname
-        }}{{ $t('library.sLikedSongs') }}
+        <img
+          class="avatar"
+          :src="data.user.avatarUrl | resizeImage"
+          loading="lazy"
+        />
+        {{ data.user.nickname }}{{ $t('library.sLikedSongs') }}
       </h1>
       <div class="search-box-likepage" @click="searchInPlaylist()">
         <div class="container" :class="{ active: inputFocus }">
@@ -174,6 +173,16 @@
       "
     />
 
+    <div class="load-more">
+      <ButtonTwoTone
+        v-show="hasMore"
+        color="grey"
+        :loading="loadingMore"
+        @click.native="loadMore(100)"
+        >{{ $t('explore.loadMore') }}</ButtonTwoTone
+      >
+    </div>
+
     <Modal
       :show="showFullDescription"
       :close="toggleFullDescription"
@@ -184,11 +193,15 @@
     >
 
     <ContextMenu ref="playlistMenu">
-      <div class="item">{{ $t('contextMenu.playNext') }}</div>
+      <!-- <div class="item">{{ $t('contextMenu.addToQueue') }}</div> -->
       <div class="item" @click="likePlaylist(true)">{{
-        playlist.subscribed ? '从音乐库删除' : '保存到音乐库'
+        playlist.subscribed
+          ? $t('contextMenu.removeFromLibrary')
+          : $t('contextMenu.saveToLibrary')
       }}</div>
-      <div class="item" @click="searchInPlaylist()">歌单内搜索</div>
+      <div class="item" @click="searchInPlaylist()">{{
+        $t('contextMenu.searchInPlaylist')
+      }}</div>
       <div
         v-if="playlist.creator.userId === data.user.userId"
         class="item"
@@ -216,7 +229,7 @@ import {
 import { getTrackDetail } from '@/api/track';
 import { isAccountLoggedIn } from '@/utils/auth';
 import nativeAlert from '@/utils/nativeAlert';
-import { disableScrolling, enableScrolling } from '@/utils/ui';
+import locale from '@/locale';
 
 import ButtonTwoTone from '@/components/ButtonTwoTone.vue';
 import ContextMenu from '@/components/ContextMenu.vue';
@@ -305,6 +318,10 @@ const specialPlaylist = {
     name: '一周原创发现',
     gradient: 'gradient-blue-purple',
   },
+  2829883282: {
+    name: '华语私人雷达',
+    gradient: 'gradient-yellow-red',
+  },
   3136952023: {
     name: '私人雷达',
     gradient: 'gradient-radar',
@@ -341,6 +358,7 @@ export default {
       showFullDescription: false,
       tracks: [],
       loadingMore: false,
+      hasMore: false,
       lastLoadedTrackIndex: 9,
       displaySearchInPlaylist: false, // 是否显示搜索框
       searchKeyWords: '', // 搜索使用的关键字
@@ -391,9 +409,9 @@ export default {
     } else {
       this.loadData(this.$route.params.id);
     }
-  },
-  destroyed() {
-    window.removeEventListener('scroll', this.handleScroll, true);
+    setTimeout(() => {
+      if (!this.show) NProgress.start();
+    }, 1000);
   },
   methods: {
     ...mapMutations(['appendTrackToPlayerList']),
@@ -409,7 +427,7 @@ export default {
     },
     likePlaylist(toast = false) {
       if (!isAccountLoggedIn()) {
-        this.showToast('此操作需要登录网易云账号');
+        this.showToast(locale.t('toast.needToLogin'));
         return;
       }
       subscribePlaylist({
@@ -438,9 +456,6 @@ export default {
           if (next !== undefined) next();
           this.show = true;
           this.lastLoadedTrackIndex = data.playlist.tracks.length - 1;
-          if (this.playlist.trackCount > this.tracks.length) {
-            window.addEventListener('scroll', this.handleScroll, true);
-          }
           return data;
         })
         .then(() => {
@@ -450,43 +465,33 @@ export default {
           }
         });
     },
-    loadMore(loadNum = 50) {
+    loadMore(loadNum = 100) {
       let trackIDs = this.playlist.trackIds.filter((t, index) => {
         if (
           index > this.lastLoadedTrackIndex &&
           index <= this.lastLoadedTrackIndex + loadNum
-        )
+        ) {
           return t;
+        }
       });
       trackIDs = trackIDs.map(t => t.id);
       getTrackDetail(trackIDs.join(',')).then(data => {
         this.tracks.push(...data.songs);
         this.lastLoadedTrackIndex += trackIDs.length;
         this.loadingMore = false;
+        if (this.lastLoadedTrackIndex + 1 === this.playlist.trackIds.length) {
+          this.hasMore = false;
+        } else {
+          this.hasMore = true;
+        }
       });
-    },
-    handleScroll(e) {
-      let dom = document.querySelector('html');
-      let scrollHeight = Math.max(dom.scrollHeight, dom.scrollHeight);
-      let scrollTop = e.target.scrollingElement.scrollTop;
-      let clientHeight =
-        dom.innerHeight || Math.min(dom.clientHeight, dom.clientHeight);
-      if (clientHeight + scrollTop + 200 >= scrollHeight) {
-        if (
-          this.lastLoadedTrackIndex + 1 === this.playlist.trackIds.length ||
-          this.loadingMore
-        )
-          return;
-        this.loadingMore = true;
-        this.loadMore();
-      }
     },
     openMenu(e) {
       this.$refs.playlistMenu.openMenu(e);
     },
     deletePlaylist() {
       if (!isAccountLoggedIn()) {
-        this.showToast('此操作需要登录网易云账号');
+        this.showToast(locale.t('toast.needToLogin'));
         return;
       }
       let confirmation = confirm(`确定要删除歌单 ${this.playlist.name}？`);
@@ -517,7 +522,7 @@ export default {
     },
     removeTrack(trackID) {
       if (!isAccountLoggedIn()) {
-        this.showToast('此操作需要登录网易云账号');
+        this.showToast(locale.t('toast.needToLogin'));
         return;
       }
       this.tracks = this.tracks.filter(t => t.id !== trackID);
@@ -531,9 +536,9 @@ export default {
     toggleFullDescription() {
       this.showFullDescription = !this.showFullDescription;
       if (this.showFullDescription) {
-        disableScrolling();
+        this.$store.commit('enableScrolling', false);
       } else {
-        enableScrolling();
+        this.$store.commit('enableScrolling', true);
       }
     },
   },
@@ -541,6 +546,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.playlist {
+  margin-top: 32px;
+}
 .playlist-info {
   display: flex;
   margin-bottom: 72px;
@@ -930,5 +938,11 @@ export default {
   .search-box-likepage {
     right: 8vw;
   }
+}
+
+.load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
 }
 </style>

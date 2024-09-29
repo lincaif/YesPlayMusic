@@ -1,5 +1,5 @@
 <template>
-  <div class="explore">
+  <div class="explore-page">
     <h1>{{ $t('explore.explore') }}</h1>
     <div class="buttons">
       <div
@@ -66,13 +66,9 @@
 <script>
 import { mapState, mapMutations } from 'vuex';
 import NProgress from 'nprogress';
-import {
-  topPlaylist,
-  highQualityPlaylist,
-  recommendPlaylist,
-  toplists,
-} from '@/api/playlist';
+import { topPlaylist, highQualityPlaylist, toplists } from '@/api/playlist';
 import { playlistCategories } from '@/utils/staticData';
+import { getRecommendPlayList } from '@/utils/playList';
 
 import ButtonTwoTone from '@/components/ButtonTwoTone.vue';
 import CoverRow from '@/components/CoverRow.vue';
@@ -86,7 +82,6 @@ export default {
     SvgIcon,
   },
   beforeRouteUpdate(to, from, next) {
-    NProgress.start();
     this.showLoadMoreButton = false;
     this.hasMore = true;
     this.playlists = [];
@@ -117,20 +112,26 @@ export default {
   },
   activated() {
     this.loadData();
+    this.$parent.$refs.scrollbar.restorePosition();
   },
   methods: {
     ...mapMutations(['togglePlaylistCategory']),
     loadData() {
-      if (!this.show) NProgress.start();
-      this.activeCategory =
-        this.$route.query.category === undefined
-          ? '全部'
-          : this.$route.query.category;
+      setTimeout(() => {
+        if (!this.show) NProgress.start();
+      }, 1000);
+      const queryCategory = this.$route.query.category;
+      if (queryCategory === undefined) {
+        this.playlists = [];
+        this.activeCategory = '全部';
+      } else {
+        this.activeCategory = queryCategory;
+      }
       this.getPlaylist();
     },
     goToCategory(Category) {
       this.showCatOptions = false;
-      this.$router.push({ path: '/explore?category=' + Category });
+      this.$router.push({ name: 'explore', query: { category: Category } });
     },
     updatePlaylist(playlists) {
       this.playlists.push(...playlists);
@@ -153,9 +154,9 @@ export default {
       return this.getTopPlayList();
     },
     getRecommendPlayList() {
-      recommendPlaylist({ limit: 100 }).then(data => {
+      getRecommendPlayList(100, true).then(list => {
         this.playlists = [];
-        this.updatePlaylist(data.result);
+        this.updatePlaylist(list);
       });
     },
     getHighQualityPlaylist() {

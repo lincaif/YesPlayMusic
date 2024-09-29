@@ -1,9 +1,11 @@
 <template>
   <div v-show="show">
     <h1>
-      <img class="avatar" :src="artist.img1v1Url | resizeImage(1024)" />{{
-        artist.name
-      }}'s Music Videos
+      <img
+        class="avatar"
+        :src="artist.img1v1Url | resizeImage(1024)"
+        loading="lazy"
+      />{{ artist.name }}'s Music Videos
     </h1>
     <MvRow :mvs="mvs" subtitle="publishTime" />
     <div class="load-more">
@@ -22,13 +24,12 @@ import ButtonTwoTone from '@/components/ButtonTwoTone.vue';
 import MvRow from '@/components/MvRow.vue';
 
 export default {
-  name: 'artistMV',
+  name: 'ArtistMV',
   components: {
     MvRow,
     ButtonTwoTone,
   },
   beforeRouteUpdate(to, from, next) {
-    NProgress.start();
     this.id = to.params.id;
     this.loadData();
     next();
@@ -58,6 +59,9 @@ export default {
   },
   methods: {
     loadData() {
+      setTimeout(() => {
+        if (!this.show) NProgress.start();
+      }, 1000);
       getArtist(this.id).then(data => {
         this.artist = data.artist;
       });

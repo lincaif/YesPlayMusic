@@ -1,5 +1,5 @@
 <template>
-  <div v-show="show" class="album">
+  <div v-show="show" class="album-page">
     <div class="playlist-info">
       <Cover
         :id="album.id"
@@ -28,7 +28,7 @@
           <span v-else>Compilation by Various Artists</span>
         </div>
         <div class="date-and-count">
-          <span v-if="album.mark === 1056768" class="explicit-symbol"
+          <span v-if="(album.mark & 1048576) === 1048576" class="explicit-symbol"
             ><ExplicitSymbol
           /></span>
           <span :title="album.publishTime | formatDate">{{
@@ -71,21 +71,32 @@
         </div>
       </div>
     </div>
-    <TrackList
-      :id="album.id"
-      :tracks="tracks"
-      :type="'album'"
-      :album-object="album"
-    />
+    <div v-if="tracksByDisc.length > 1">
+      <div v-for="item in tracksByDisc" :key="item.disc">
+        <h2 class="disc">Disc {{ item.disc }}</h2>
+        <TrackList
+          :id="album.id"
+          :tracks="item.tracks"
+          :type="'album'"
+          :album-object="album"
+        />
+      </div>
+    </div>
+    <div v-else>
+      <TrackList
+        :id="album.id"
+        :tracks="tracks"
+        :type="'album'"
+        :album-object="album"
+      />
+    </div>
     <div class="extra-info">
       <div class="album-time"></div>
       <div class="release-date">
         {{ $t('album.released') }}
         {{ album.publishTime | formatDate('MMMM D, YYYY') }}
       </div>
-      <div v-if="album.company !== null" class="copyright">
-        © {{ album.company }}
-      </div>
+      <div v-if="album.company" class="copyright"> © {{ album.company }} </div>
     </div>
     <div v-if="filteredMoreAlbums.length !== 0" class="more-by">
       <div class="section-title">
@@ -107,18 +118,26 @@
       :close="toggleFullDescription"
       :show-footer="false"
       :click-outside-hide="true"
-      title="专辑介绍"
+      :title="$t('album.albumDesc')"
     >
       <p class="description-fulltext">
         {{ album.description }}
       </p>
     </Modal>
     <ContextMenu ref="albumMenu">
-      <div class="item">{{ $t('contextMenu.playNext') }}</div>
+      <!-- <div class="item">{{ $t('contextMenu.addToQueue') }}</div> -->
       <div class="item" @click="likeAlbum(true)">{{
-        dynamicDetail.isSub ? '从音乐库删除' : '保存到音乐库'
+        dynamicDetail.isSub
+          ? $t('contextMenu.removeFromLibrary')
+          : $t('contextMenu.saveToLibrary')
       }}</div>
-      <div class="item">添加到歌单</div>
+      <div class="item">{{ $t('contextMenu.addToPlaylist') }}</div>
+      <div class="item" @click="copyUrl(album.id)">{{
+        $t('contextMenu.copyUrl')
+      }}</div>
+      <div class="item" @click="openInBrowser(album.id)">{{
+        $t('contextMenu.openInBrowser')
+      }}</div>
     </ContextMenu>
   </div>
 </template>
@@ -128,10 +147,11 @@ import { mapMutations, mapActions, mapState } from 'vuex';
 import { getArtistAlbum } from '@/api/artist';
 import { getTrackDetail } from '@/api/track';
 import { getAlbum, albumDynamicDetail, likeAAlbum } from '@/api/album';
+import locale from '@/locale';
 import { splitSoundtrackAlbumTitle, splitAlbumTitle } from '@/utils/common';
 import NProgress from 'nprogress';
 import { isAccountLoggedIn } from '@/utils/auth';
-import { disableScrolling, enableScrolling } from '@/utils/ui';
+import { groupBy, toPairs, sortBy } from 'lodash';
 
 import ExplicitSymbol from '@/components/ExplicitSymbol.vue';
 import ButtonTwoTone from '@/components/ButtonTwoTone.vue';
@@ -153,12 +173,13 @@ export default {
     ContextMenu,
   },
   beforeRouteUpdate(to, from, next) {
-    NProgress.start();
+    this.show = false;
     this.loadData(to.params.id);
     next();
   },
   data() {
     return {
+      show: false,
       album: {
         id: 0,
         picUrl: '',
@@ -168,7 +189,6 @@ export default {
       },
       tracks: [],
       showFullDescription: false,
-      show: false,
       moreAlbums: [],
       dynamicDetail: {},
       subtitle: '',
@@ -199,6 +219,14 @@ export default {
         return [...realAlbums, ...restItems].slice(0, 5);
       }
     },
+    tracksByDisc() {
+      if (this.tracks.length <= 1) return [];
+      const pairs = toPairs(groupBy(this.tracks, 'cd'));
+      return sortBy(pairs, p => p[0]).map(items => ({
+        disc: items[0],
+        tracks: items[1],
+      }));
+    },
   },
   created() {
     this.loadData(this.$route.params.id);
@@ -211,7 +239,7 @@ export default {
     },
     likeAlbum(toast = false) {
       if (!isAccountLoggedIn()) {
-        this.showToast('此操作需要登录网易云账号');
+        this.showToast(locale.t('toast.needToLogin'));
         return;
       }
       likeAAlbum({
@@ -245,6 +273,9 @@ export default {
       }
     },
     loadData(id) {
+      setTimeout(() => {
+        if (!this.show) NProgress.start();
+      }, 1000);
       getAlbum(id).then(data => {
         this.album = data.album;
         this.tracks = data.songs;
@@ -267,22 +298,39 @@ export default {
         this.dynamicDetail = data;
       });
     },
-    openMenu(e) {
-      this.$refs.albumMenu.openMenu(e);
-    },
     toggleFullDescription() {
       this.showFullDescription = !this.showFullDescription;
       if (this.showFullDescription) {
-        disableScrolling();
+        this.$store.commit('enableScrolling', false);
       } else {
-        enableScrolling();
+        this.$store.commit('enableScrolling', true);
       }
+    },
+    openMenu(e) {
+      this.$refs.albumMenu.openMenu(e);
+    },
+    copyUrl(id) {
+      let showToast = this.showToast;
+      this.$copyText(`https://music.163.com/#/album?id=${id}`)
+        .then(function () {
+          showToast(locale.t('toast.copied'));
+        })
+        .catch(error => {
+          showToast(`${locale.t('toast.copyFailed')}${error}`);
+        });
+    },
+    openInBrowser(id) {
+      const url = `https://music.163.com/#/album?id=${id}`;
+      window.open(url);
     },
   },
 };
 </script>
 
 <style lang="scss" scoped>
+.album-page {
+  margin-top: 32px;
+}
 .playlist-info {
   display: flex;
   width: 78vw;
@@ -339,6 +387,9 @@ export default {
       }
     }
   }
+}
+.disc {
+  color: var(--color-text);
 }
 
 .explicit-symbol {
